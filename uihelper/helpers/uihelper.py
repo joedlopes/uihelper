@@ -1404,7 +1404,6 @@ def Alert(
     message: str,
     parent: Optional[QWidget] = None,
 ) -> None:
-    print(title, message, parent)
     QMessageBox.warning(parent, title, message, QMessageBox.StandardButton.Ok)
 
 
@@ -1606,12 +1605,16 @@ class ApplicationContext:
 
 
 def Application(
-    ctx: ApplicationContext,
+    ctx: Optional[ApplicationContext] = None,
     argv: Optional[List[str]] = None,
     css: Optional[str] = None,
 ) -> QApplication:
-    app = QApplication(argv)
-    app.ctx = ctx
+    if argv is None:
+        app = QApplication()
+    else:
+        app = QApplication(argv)
+    if ctx is not None:
+        app.ctx = ctx
     if css is not None:
         app.setStyleSheet(css)
     return app
