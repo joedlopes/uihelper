@@ -9,7 +9,7 @@ import pyqtgraph.opengl as pgl
 import numpy as np
 
 
-class PCLViewWidget_PyQtGraph(pgl.GLViewWidget):
+class PCLViewWidget(pgl.GLViewWidget):
     """
     Point Cloud visualization.
     Use the *draw* (Draw3D) to draw points and lines.

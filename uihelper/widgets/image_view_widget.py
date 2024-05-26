@@ -67,11 +67,9 @@ class ImageViewWidget(QGraphicsView):
             self.set_image_pixmap(None)
             return
 
-        assert isinstance(image, np.ndarray)
         h, w = image.shape[0], image.shape[1]
         d = 1
         if len(image.shape) > 2 and image.shape[2] >= 3:
-            # image = image[:, :, ::-1]  # OpenCV image is loaded as BGR
             d = image.shape[2]
 
         bpl = w * d
@@ -90,10 +88,8 @@ class ImageViewWidget(QGraphicsView):
         if qpixmap is None:
             self.image_item.setPixmap(QPixmap())
         else:
-            # self.resetTransform()
             image, self.w, self.h = qpixmap, qpixmap.width(), qpixmap.height()
             self.image_item.setPixmap(image)
-            # self.centerOn(self.image_item)
             self._scene.setSceneRect(0, 0, self.w, self.h)
 
     def mousePressEvent(self, ev: QMouseEvent) -> None:
@@ -159,4 +155,3 @@ class ImageViewWidget(QGraphicsView):
         self.fitInView(
             self.image_item.boundingRect(), Qt.AspectRatioMode.KeepAspectRatio
         )
-        # self.scale(self.w / self._scene.sceneRect().width(), self.h / self._scene.sceneRect().height())

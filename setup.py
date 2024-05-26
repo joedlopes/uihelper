@@ -1,3 +1,9 @@
+#
+# Author: Joed Lopes da Silva
+#
+# This work is licensed under the terms of the MIT license.
+# For a copy, see <https://opensource.org/licenses/MIT>.
+
 from setuptools import setup
 
 
@@ -27,11 +33,11 @@ setup(
         "uihelper.helpers",
         "uihelper.resources",
         "uihelper.widgets",
-        "uihelper.property_editor_tree",
+        "uihelper.widgets.property_editor_tree",
     ],
     # include non python files
     package_data={
-        "uihelper.property_editor_tree": [
+        "uihelper.widgets.property_editor_tree": [
             "uihelper/widgets/property_editor_tree/icons/*.png"
         ],
     },

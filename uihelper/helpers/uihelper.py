@@ -84,18 +84,18 @@ from pydantic.types import PositiveInt
 
 from typing import Final
 
-# __all__ = [
-#     "QFont",
-#     "QFontDatabase",
-#     "QtWidgets",
-#     "QtGui",
-#     "QtCore",
-#     "Signal",
-#     "QObject",
-#     "QHeaderView",
-#     "QAbstractItemView",
-#     "QTabWidget",
-# ]
+__all__ = [
+    "QFont",
+    "QFontDatabase",
+    "QtWidgets",
+    "QtGui",
+    "QtCore",
+    "Signal",
+    "QObject",
+    "QHeaderView",
+    "QAbstractItemView",
+    "QTabWidget",
+]
 
 # Size properties
 
@@ -150,7 +150,7 @@ def window_ops_set(
         title=widget.setWindowTitle,
     )
 
-    for key, val in options.model_dump(exclude_unset=True).items():
+    for key, val in options.dict(exclude_unset=True).items():
         if isinstance(val, tuple):
             func_map[key](*val)
         else:
@@ -1404,13 +1404,8 @@ def Alert(
     message: str,
     parent: Optional[QWidget] = None,
 ) -> None:
-    QMessageBox(
-        QMessageBox.Warning,
-        title,
-        message,
-        parent=parent,
-        flags=QMessageBox.NoButton,
-    ).exec_()
+    print(title, message, parent)
+    QMessageBox.warning(parent, title, message, QMessageBox.StandardButton.Ok)
 
 
 def Error(
@@ -1449,8 +1444,8 @@ def Color(
         77,
     ),
     parent: Optional[QWidget] = None,
-) -> Optional[QColor]:
-    initial: Optional[QColor] = None
+) -> QColor | None:
+    initial: QColor | None = None
     if isinstance(color, QColor):
         initial = color
     elif isinstance(color, tuple):
@@ -1504,7 +1499,7 @@ def OpenFiles(
     directory: Optional[str] = None,
     parent: Optional[QWidget] = None,
     native: bool = True,
-) -> Optional[List[str]]:
+) -> List[str] | None:
     options = QFileDialog.Option()
     if not native:
         options = QFileDialog.Option.DontUseNativeDialog
