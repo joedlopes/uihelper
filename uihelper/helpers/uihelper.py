@@ -77,6 +77,7 @@ from PySide6.QtCore import (
     Signal,
     QObject,
     QKeyCombination,
+    QCoreApplication,
 )
 
 from pydantic import BaseModel
@@ -873,8 +874,17 @@ def ToolBar(
 # Status Bar
 
 
-def StatusBar() -> QStatusBar:
+def StatusBar(
+    *items,
+) -> QStatusBar:
     statusbar = QStatusBar()
+
+    if len(items) > 0:
+        for item in items:
+            if isinstance(item, QAction):
+                statusbar.addAction(item)
+            elif isinstance(item, QWidget):
+                statusbar.addWidget(item)
 
     return statusbar
 
@@ -909,20 +919,25 @@ class DockWidgetSized(QDockWidget):
         widget: Optional[QWidget] = None,
         size_hint: Tuple[int, int],
         title: str,
+        parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__()
+        if parent is not None:
+            self.setParent(parent)
         self.setWindowTitle(title)
         self.setWidget(widget)
-        self._size_hint = size_hint
+        self._hint_width, self._hint_height = size_hint[:2]
 
     def set_hint_size(self, w: int, h: int) -> None:
         self._hint_width = w
         self._hint_height = h
 
     def sizeHint(self) -> QSize:
+        print("sizeHint", self._hint_width, self._hint_height)
         return QSize(self._hint_width, self._hint_height)
 
     def minimumSizeHint(self) -> QSize:
+        print("minimumSizeHint", self._hint_width, self._hint_height)
         return QSize(self._hint_width, self._hint_height)
 
 
@@ -1648,3 +1663,8 @@ def Timer(
         timer.start()
 
     return timer
+
+
+# process events
+def process_events() -> None:
+    QCoreApplication.processEvents()
