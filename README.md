@@ -1,7 +1,7 @@
 # uihelper: PySide6 UI helper
 
 This is a set of helpers to improve the development and code readability for PySide6 development.
-The main focus is on making easier to setup the UI layout and configuration of components. In addition, it provide a iterative 3D plotting library, for quick data visualization.
+The main focus is on making easier to setup the UI layout and configuration of components. In addition, it provides an iterative 3D plotting library, for quick data visualization.
 
 ## Installation
 
