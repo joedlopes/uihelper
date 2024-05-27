@@ -12,7 +12,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="uihelper",
-    version="0.1",
+    version="0.0.2",
     author="Joed Lopes da Silva",
     author_email="joedlopes@github.com",
     description="The helper for GUI using PySide6",
@@ -22,7 +22,7 @@ setup(
     project_urls={
         "Bug Tracker": "https://github.com/joedlopes/uihelper/issues",
     },
-    # install_requires=["pyside6", "pyqtgraph", "pyopengl", "numpy", "opencv-python"],
+    install_requires=["pyside6", "pydantic", "pyqtgraph", "pyopengl", "numpy"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
