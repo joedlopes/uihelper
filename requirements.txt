@@ -1,0 +1,4 @@
+pyside6<=6.7
+pyqtgraph
+pyopengl
+numpy

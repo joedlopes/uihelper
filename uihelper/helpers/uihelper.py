@@ -2068,7 +2068,7 @@ class LogLevel(Enum):
     WARNING = ("ma-warning-black", "Warning")
     INFO = ("ma-info-black", "Info")
     DEBUG = ("ma-terminal-black", "Debug")
-    
+
     def __init__(self, icon_path, display_name):
         self.icon_path = icon_path
         self.display_name = display_name
@@ -2078,14 +2078,14 @@ class LogLevel(Enum):
 
 
 class LoggerIcons:
-    
+
     ERROR: QIcon
     WARNING: QIcon
     INFO: QIcon
     DEBUG: QIcon
-    
+
     _initialized: bool = False
-    
+
     @classmethod
     def initialize(cls) -> None:
         if cls._initialized:
@@ -2095,11 +2095,11 @@ class LoggerIcons:
         cls.WARNING = IconM("ma-warning-black", color=(255, 150, 0, 255))
         cls.INFO = IconM("ma-info-black", color=(0, 200, 0, 255))
         cls.DEBUG = IconM("ma-info-black", color=(0, 200, 255, 255))
-        
+
     @classmethod
     def get_icon(cls, level: "LogLevel") -> QIcon:
         cls.initialize()
-        
+
         if level == LogLevel.ERROR:
             return cls.ERROR
         elif level == LogLevel.WARNING:
@@ -2211,6 +2211,7 @@ class LoggerContext(QObject):
     def debug(self, source: str, message: Any):
         self.log(LogLevel.DEBUG, source, message)
 
+
 class LoggerWidget(QWidget):
     """Widget that displays log messages in a table format"""
 
@@ -2252,7 +2253,7 @@ class LoggerWidget(QWidget):
         self.table.insertRow(row)
 
         level_item = QTableWidgetItem(LogLevel[level].display_name)
-        #level_item.setIcon(QIcon(LogLevel[level].icon_path))
+        # level_item.setIcon(QIcon(LogLevel[level].icon_path))
         level_item.setIcon(LoggerIcons.get_icon(LogLevel[level]))
 
         items = [

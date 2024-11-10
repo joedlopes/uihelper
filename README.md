@@ -11,12 +11,19 @@ Install via pip:
 python -m pip install uihelper
 ```
 
+Install via pip from git:
+
+```bash
+pip install git+https://github.com/joedlopes/uihelper.git
+```
+
+
 Tested on Python 3.12 on Windows 10, Windows 11, MacOS M2, Ubuntu 22.
 
 Install the requirements:
 
 ```bash
-python -m pip install pyside6 pyopengl pyqtgraph numpy
+python -m pip install pyside6==6.7 pyopengl pyqtgraph numpy
 ```
 
 Additional libraries for styling:
@@ -31,6 +38,8 @@ Install from source:
 python -m pip install setuptools
 python setup.py install
 ```
+
+
 
 ## Examples Gallery
 
