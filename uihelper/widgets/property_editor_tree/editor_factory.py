@@ -132,7 +132,7 @@ class EditorFactory:
     def create_boolean(
         parent: Union[QWidget, None],
         property_item_model: PropertyItemModel,
-    ) -> QSpinBox:
+    ) -> QComboBox:
         editor: QComboBox = QComboBox(parent)
 
         options: dict = property_item_model.get_editor_options()

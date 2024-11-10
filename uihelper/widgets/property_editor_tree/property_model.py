@@ -22,7 +22,7 @@ def list_static_class_variables(class_to_list):
 def filter_dict(
     source: Dict[str, Any],
     keys: List[str],
-    out: Dict[str, Any] = None,
+    out: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     if out is None:
         out = dict()
@@ -181,9 +181,9 @@ class PropertyItemModel:
 
         self._aux_data: Any = None  # to be used outside (widget, etc)
 
-        self._specific_listener: Optional[
-            PropertyModelListener
-        ] = None  # use along tree widget item
+        self._specific_listener: Optional[PropertyModelListener] = (
+            None  # use along tree widget item
+        )
 
     def set_specific_listener(
         self, specific_listener: Optional[PropertyModelListener] = None
@@ -304,10 +304,10 @@ class PropertyItemModel:
             self._editor_options[EditorOptions.NUMBER_SLIDER_EDITOR] = check_dict_value(
                 options, EditorOptions.NUMBER_SLIDER_EDITOR, bool, True
             )
-            self._editor_options[
-                EditorOptions.NUMBER_SPINNER_EDITOR
-            ] = check_dict_value(
-                options, EditorOptions.NUMBER_SPINNER_EDITOR, bool, True
+            self._editor_options[EditorOptions.NUMBER_SPINNER_EDITOR] = (
+                check_dict_value(
+                    options, EditorOptions.NUMBER_SPINNER_EDITOR, bool, True
+                )
             )
 
             type_to_check = int if self.get_type() == PropertyTypes.INTEGER else float

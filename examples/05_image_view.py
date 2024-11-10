@@ -1,5 +1,9 @@
-import numpy as np
+import sys
+
+sys.path.append("../")
 from uihelper import dc, ImageViewWidget
+
+import numpy as np
 
 
 app = dc.Application()
@@ -15,7 +19,8 @@ def update_image():
 
 
 window = dc.Widget(
-    window_ops=dc.WindowOps(size=(512, 512), title="Image View"),
+    window_title="Image View",
+    window_size=(512, 512),
     layout=dc.Rows(
         dc.Button("Random Image", on_click=update_image),
         dc.NextRow,

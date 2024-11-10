@@ -315,9 +315,9 @@ class PropertyGroupTreeItemWidget(QTreeWidgetItem):
 
         assert isinstance(property_group_model, PropertyGroupModel)
         self.property_group_model: Optional["PropertyGroupModel"] = property_group_model
-        self.parent_tree: Union[
-            QTreeWidget, "PropertyGroupTreeItemWidget"
-        ] = parent_tree
+        self.parent_tree: Union[QTreeWidget, "PropertyGroupTreeItemWidget"] = (
+            parent_tree
+        )
 
         self.setText(0, self.property_group_model.get_name())
         self.setFirstColumnSpanned(True)

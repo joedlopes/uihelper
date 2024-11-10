@@ -4,10 +4,25 @@
 #
 # Copyright Joed 2023
 #
-
-from typing import List, Tuple, Union, Optional, Sequence
-
+from functools import wraps
+from typing import (
+    List,
+    Tuple,
+    Union,
+    Optional,
+    Sequence,
+    Final,
+    Callable,
+    TypeVar,
+    Any,
+    Dict,
+    cast,
+    Literal,
+)
 import os
+import logging
+from datetime import datetime
+from enum import Enum
 
 from PySide6 import QtWidgets
 from PySide6 import QtGui
@@ -57,6 +72,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QAbstractItemView,
     QGroupBox,
+    QItemDelegate,
 )
 
 from PySide6.QtGui import (
@@ -78,148 +94,405 @@ from PySide6.QtCore import (
     QObject,
     QKeyCombination,
     QCoreApplication,
+    QTimer,
 )
 
-from pydantic import BaseModel
-from pydantic.types import PositiveInt
-
-from typing import Final
 
 __all__ = [
-    "QFont",
-    "QFontDatabase",
+    # QT
+    "Qt",
     "QtWidgets",
     "QtGui",
     "QtCore",
+    "QFont",
+    "QObject",
+    "QApplication",
+    "QWidget",
+    "QMainWindow",
+    "QCoreApplication",
+    "QFontDatabase",
     "Signal",
+    "Slot",
     "QObject",
     "QHeaderView",
     "QAbstractItemView",
     "QTabWidget",
+    "QKeySequence",
+    # Library Components
+    "Button",
+    "ToolButton",
+    "Label",
+    "ComboBox",
+    "TextEdit",
+    "SpinBox",
+    "DoubleSpinBox",
+    "LineEdit",
+    "CheckBox",
+    "RadioButton",
+    "ListView",
+    "TableWidgetItem",
+    "TableWidget",
+    "TreeWidget",
+    "TreeWidgetItem",
+    "PixmapM",
+    "IconM",
+    "Action",
+    "Menu",
+    "MenuBar",
+    "ToolBarNextLine",
+    "ToolBar",
+    "StatusBar",
+    "DockWidget",
+    "DockWidgetSized",
+    "Splitter",
+    "SpacerItem",
+    "VSpacer",
+    "HSpacer",
+    "ScrollArea",
+    "Align",
+    "set_layout_props",
+    "VBox",
+    "HBox",
+    "NextColumn",
+    "NextRow",
+    "AddStretch",
+    "AddStretchLayout",
+    "Columns",
+    "Rows",
+    "set_uniform_label_width",
+    "Form",
+    "GroupBox",
+    "Frame",
+    "HLine",
+    "StackedWidget",
+    "Widget",
+    "MainWindow",
+    "Alert",
+    "Error",
+    "Confirm",
+    "Color",
+    "OpenFile",
+    "OpenFiles",
+    "SaveFile",
+    "OpenDir",
+    "ApplicationContext",
+    "Application",
+    "app_set_font",
+    "Timer",
 ]
 
 # Size properties
 
 
 class SizePolicy:
-    Expanding: Final = QSizePolicy.Expanding
-    Maximum: Final = QSizePolicy.Maximum
-    Minimum: Final = QSizePolicy.Minimum
-    Preferred: Final = QSizePolicy.Preferred
-    Fixed: Final = QSizePolicy.Fixed
+    Expanding: Final = QSizePolicy.Policy.Expanding
+    Maximum: Final = QSizePolicy.Policy.Maximum
+    Minimum: Final = QSizePolicy.Policy.Minimum
+    Preferred: Final = QSizePolicy.Policy.Preferred
+    Fixed: Final = QSizePolicy.Policy.Fixed
 
 
-class SizeOps(BaseModel):
-    min_width: Optional[PositiveInt] = None
-    max_width: Optional[PositiveInt] = None
-    min_height: Optional[PositiveInt] = None
-    max_height: Optional[PositiveInt] = None
+class DockArea:
+    Left: Final = Qt.DockWidgetArea.LeftDockWidgetArea
+    Right: Final = Qt.DockWidgetArea.RightDockWidgetArea
+    Top: Final = Qt.DockWidgetArea.TopDockWidgetArea
+    Bottom: Final = Qt.DockWidgetArea.BottomDockWidgetArea
+    All: Final = Qt.DockWidgetArea.AllDockWidgetAreas
+    No: Final = Qt.DockWidgetArea.NoDockWidgetArea
 
 
-def size_ops_set(widget: QWidget, options: Optional[SizeOps] = None) -> None:
-    if options is None:
-        return
+# Decorator for Window Properties
 
-    func_map = dict(
-        min_width=widget.setMinimumWidth,
-        max_width=widget.setMaximumWidth,
-        min_height=widget.setMinimumHeight,
-        max_height=widget.setMaximumHeight,
-    )
-
-    for key, val in options.dict(exclude_unset=True).items():
-        func_map[key](val)
+DecoratorFunction = TypeVar("DecoratorFunction", bound=Callable[..., Any])
 
 
-# Window Properties
+def window_ops_set(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        window_size = kwargs.get("window_size")
+        window_title = kwargs.get("window_title")
+
+        if window_size is not None:
+            if not isinstance(window_size, tuple) or len(window_size) != 2:
+                raise TypeError("window_size must be a tuple of two integers")
+            if any(not isinstance(dim, int) or dim <= 0 for dim in window_size):
+                raise ValueError("Both dimensions in size must be positive integers")
+            widget.resize(*window_size)
+
+        if window_title is not None:
+            if not isinstance(window_title, str):
+                raise TypeError("title must be a string")
+            widget.setWindowTitle(window_title)
+
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
 
 
-class WindowOps(BaseModel):
-    size: Tuple[PositiveInt, PositiveInt] = None
-    title: Optional[str] = None
+# Decorators for setting widget properties
 
 
-def window_ops_set(
-    widget: QWidget,
-    options: Optional[WindowOps] = None,
-) -> None:
-    if options is None:
-        return
+def set_widget_size(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        min_width = kwargs.get("min_width")
+        max_width = kwargs.get("max_width")
+        min_height = kwargs.get("min_height")
+        max_height = kwargs.get("max_height")
 
-    func_map = dict(
-        size=widget.resize,
-        title=widget.setWindowTitle,
-    )
+        if min_width is not None:
+            if not isinstance(min_width, int) or min_width < 0:
+                raise ValueError("min_width must be a non-negative integer")
+            widget.setMinimumWidth(min_width)
+        if max_width is not None:
+            if not isinstance(max_width, int) or max_width < 0:
+                raise ValueError("max_width must be a non-negative integer")
+            widget.setMaximumWidth(max_width)
+        if min_height is not None:
+            if not isinstance(min_height, int) or min_height < 0:
+                raise ValueError("min_height must be a non-negative integer")
+            widget.setMinimumHeight(min_height)
+        if max_height is not None:
+            if not isinstance(max_height, int) or max_height < 0:
+                raise ValueError("max_height must be a non-negative integer")
+            widget.setMaximumHeight(max_height)
 
-    for key, val in options.dict(exclude_unset=True).items():
-        if isinstance(val, tuple):
-            func_map[key](*val)
-        else:
-            func_map[key](val)
+        if min_width is not None and max_width is not None and min_width > max_width:
+            raise ValueError("min_width cannot be greater than max_width")
+        if (
+            min_height is not None
+            and max_height is not None
+            and min_height > max_height
+        ):
+            raise ValueError("min_height cannot be greater than max_height")
 
+        return widget
 
-# Base sets
-
-
-def set_widget_object_name(
-    widget: QWidget,
-    object_name: Optional[str],
-) -> None:
-    if isinstance(object_name, str):
-        widget.setObjectName(object_name)
-
-
-def set_widget_style_sheet(widget: QWidget, css: Optional[str] = None) -> None:
-    if isinstance(css, str):
-        widget.setStyleSheet(css)
-
-
-def set_widget_text(widget, text: str) -> None:
-    if isinstance(text, str):
-        widget.setText(text)
-
-
-def set_widget_tooltip(
-    widget,
-    tooltip_text: str,
-    tooltip_duration: Optional[int] = None,
-) -> None:
-    if isinstance(tooltip_text, str):
-        widget.setToolTip(tooltip_text)
-
-    if tooltip_duration is not None:
-        widget.setToolTipDuration(int)
+    return cast(DecoratorFunction, wrapper)
 
 
-def set_widget_shortcut(widget, shortcut: str) -> None:
-    if isinstance(shortcut, str):
-        widget.setShortcut(shortcut)
+def set_widget_object_name(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        object_name = kwargs.get("object_name")
+        if object_name:
+            widget.setObjectName(object_name)
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
 
 
-def set_widget_icon(
-    widget,
-    icon: QIcon,
-    icon_size: Optional[Tuple[int, int]] = None,
-) -> None:
-    if isinstance(icon, QIcon):
-        widget.setIcon(icon)
+def set_widget_style_sheet(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        css = kwargs.get("css")
+        if css:
+            widget.setStyleSheet(css)
+        return widget
 
-        if isinstance(icon_size, tuple) and len(icon_size) == 2:
-            widget.setIconSize(QSize(icon_size[0], icon_size[0]))
+    return cast(DecoratorFunction, wrapper)
+
+
+def set_widget_tooltip(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        tooltip_text = kwargs.get("tooltip")
+        tooltip_duration = kwargs.get("tooltip_duration_ms")
+        if tooltip_text:
+            widget.setToolTip(tooltip_text)
+        if tooltip_duration is not None:
+            widget.setToolTipDuration(tooltip_duration)
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
+
+
+def set_widget_shortcut(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        shortcut = kwargs.get("shortcut")
+        if shortcut:
+            widget.setShortcut(shortcut)
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
+
+
+def set_widget_icon(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        icon = kwargs.get("icon")
+        icon_size = kwargs.get("icon_size")
+        if icon:
+            widget.setIcon(icon)
+            if icon_size:
+                widget.setIconSize(QSize(icon_size[0], icon_size[1]))
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
+
+
+def set_widget_text(func: DecoratorFunction) -> DecoratorFunction:
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        widget = func(*args, **kwargs)
+        text = kwargs.get("text")
+        if text is None and len(args) > 0 and isinstance(args[0], str):
+            text = args[0]
+
+        if text is not None:
+            widget.setText(text)
+        return widget
+
+    return cast(DecoratorFunction, wrapper)
+
+
+def connect_slot(signal_name: str, parameter_name: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            widget = func(*args, **kwargs)
+            slot = kwargs.get(parameter_name)
+            if slot is not None:
+                if not callable(slot):
+                    raise TypeError(f"{parameter_name} must be a callable")
+                signal = getattr(widget, signal_name)
+                signal.connect(slot)
+            return widget
+
+        return wrapper
+
+    return decorator
+
+
+def set_widget_attribute(
+    method_name: str,
+    param_name: str,
+    param_types: Union[type, Tuple[type, ...]],
+    default_value: Optional[Any] = None,
+):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            widget = func(*args, **kwargs)
+            param_value = kwargs.get(param_name, default_value)
+            if param_value is not None:
+                # Handle multiple parameter types
+                if isinstance(param_types, tuple):
+                    if not isinstance(param_value, tuple) or len(param_value) != len(
+                        param_types
+                    ):
+                        raise TypeError(
+                            f"'{param_name}' must be a tuple of {len(param_types)} elements"
+                        )
+                    for val, typ in zip(param_value, param_types):
+                        if not isinstance(val, typ):
+                            raise TypeError(
+                                f"Each element in '{param_name}' must be of type {typ.__name__}"
+                            )
+                else:
+                    if not isinstance(param_value, param_types):
+                        raise TypeError(
+                            f"'{param_name}' must be of type {param_types.__name__}"
+                        )
+                method = getattr(widget, method_name)
+                if isinstance(param_value, tuple):
+                    method(*param_value)
+                else:
+                    method(param_value)
+            return widget
+
+        return wrapper
+
+    return decorator
+
+
+def call_widget_method(method_name: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            widget = func(*args, **kwargs)
+            method = getattr(widget, method_name)
+            method()
+            return widget
+
+        return wrapper
+
+    return decorator
+
+
+def call_widget_method_with_params(
+    method_name: str,
+    param_name: str,
+    param_types: Union[type, Tuple[type, ...]],
+    default_value: Optional[Any] = None,
+):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            widget = func(*args, **kwargs)
+            param_value = kwargs.get(param_name, default_value)
+            if param_value is not None:
+                # Type checking
+                if isinstance(param_types, tuple):
+                    if not isinstance(param_value, tuple) or len(param_value) != len(
+                        param_types
+                    ):
+                        raise TypeError(
+                            f"'{param_name}' must be a tuple of {len(param_types)} elements"
+                        )
+                    for val, typ in zip(param_value, param_types):
+                        if not isinstance(val, typ):
+                            raise TypeError(
+                                f"Each element in '{param_name}' must be of type {typ.__name__}"
+                            )
+                else:
+                    if not isinstance(param_value, param_types):
+                        raise TypeError(
+                            f"'{param_name}' must be of type {param_types.__name__}"
+                        )
+                method = getattr(widget, method_name)
+                if isinstance(param_value, tuple):
+                    method(*param_value)
+                else:
+                    method(param_value)
+            return widget
+
+        return wrapper
+
+    return decorator
 
 
 # Widgets
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_icon
+@set_widget_shortcut
+@set_widget_size
+@set_widget_tooltip
+@connect_slot("clicked", "on_click")
 def Button(
     text: Optional[str] = None,
     *,
     widget: Optional[QPushButton] = None,
     object_name: Optional[str] = None,
-    on_click: Optional[Slot] = None,
+    on_click: Optional[Callable[[], None]] = None,
     icon: Optional[QIcon] = None,
     icon_size: Optional[Tuple[int, int]] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
     shortcut: Optional[str] = None,
     tooltip: Optional[str] = None,
@@ -228,20 +501,18 @@ def Button(
     if widget is None:
         widget = QPushButton()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    set_widget_icon(widget, icon, icon_size)
-    set_widget_shortcut(widget, shortcut)
-    size_ops_set(widget, size_ops)
-    set_widget_tooltip(widget, tooltip, tooltip_duration_ms)
-
-    if on_click is not None:
-        widget.clicked.connect(on_click)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_icon
+@set_widget_shortcut
+@set_widget_size
+@set_widget_tooltip
+@set_widget_attribute("setToolButtonStyle", "button_style", Qt.ToolButtonStyle)
+@connect_slot("clicked", "on_click")
 def ToolButton(
     text: Optional[str] = None,
     button_style: Optional[
@@ -250,10 +521,13 @@ def ToolButton(
     *,
     widget: Optional[QToolButton] = None,
     object_name: Optional[str] = None,
-    on_click: Optional[Slot] = None,
+    on_click: Optional[Callable[[], None]] = None,
     icon: Optional[QIcon] = None,
     icon_size: Optional[Tuple[int, int]] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
     shortcut: Optional[str] = None,
     tooltip: Optional[str] = None,
@@ -262,110 +536,110 @@ def ToolButton(
     if widget is None:
         widget = QToolButton()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    set_widget_icon(widget, icon, icon_size)
-    set_widget_shortcut(widget, shortcut)
-    size_ops_set(widget, size_ops)
-    set_widget_tooltip(widget, tooltip, tooltip_duration_ms)
-
-    if button_style is not None:
-        widget.setToolButtonStyle(button_style)
-
-    if on_click is not None:
-        widget.clicked.connect(on_click)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_shortcut
+@set_widget_size
+@set_widget_attribute("setAlignment", "alignment", Qt.AlignmentFlag)
+@set_widget_attribute("setPixmap", "pixmap", QPixmap)
+@connect_slot("clicked", "on_click")
 def Label(
     text: Optional[str] = None,
     *,
     widget: Optional[QLabel] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
     pixmap: Optional[QPixmap] = None,
     alignment: Optional[int] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QLabel:
     if widget is None:
         widget = QLabel()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    size_ops_set(widget, size_ops)
-
-    if isinstance(pixmap, QPixmap):
-        widget.setPixmap(pixmap)
-
-    if text is not None:
-        widget.setText(text)
-
-    if alignment is not None:
-        widget.setAlignment(alignment)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_attribute("singleStep", "single_step", int)
+@set_widget_attribute("value", "value", int)
+@connect_slot("valueChanged", "on_value_changed")
 def SpinBox(
     *,
-    range: Optional[Tuple[int, int]] = (0, 1000),
+    value_range: Optional[Tuple[int, int]] = (0, 1000),
     value: int = 1,
     single_step: int = 1,
-    on_value_changed: Optional[Slot] = None,
+    on_value_changed: Optional[Callable[[int], None]] = None,
     widget: Optional[QSpinBox] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QSpinBox:
     if widget is None:
         widget = QSpinBox()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if isinstance(range, tuple):
-        assert len(range) == 2, "Range must have a min and max value"
-        widget.setRange(range[0], range[1])
-
-    if single_step is not None:
-        widget.setSingleStep(single_step)
-
-    if value is not None:
-        widget.setValue(value)
-
-    if on_value_changed is not None:
-        widget.valueChanged.connect(on_value_changed)
+    if value_range is not None:
+        if not (isinstance(value_range, tuple) and len(value_range) == 2):
+            raise ValueError("value_range must be a tuple of (min, max)")
+        min_value, max_value = value_range
+        if not (
+            isinstance(min_value, (int, float)) and isinstance(max_value, (int, float))
+        ):
+            raise ValueError("min and max values in value_range must be numbers")
+        if min_value > max_value:
+            raise ValueError("min value cannot be greater than max value")
+        widget.setRange(min_value, max_value)
 
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@connect_slot("valueChanged", "on_value_changed")
 def DoubleSpinBox(
     *,
     decimals: int = 3,
-    range: Optional[Tuple[int, int]] = (0, 1000),
-    value: int = 1,
-    single_step: int = 1,
+    value_range: Optional[Tuple[float, float]] = (0.0, 1000.0),
+    value: float = 1.0,
+    single_step: float = 1.0,
     widget: Optional[QDoubleSpinBox] = None,
-    on_value_changed: Optional[Slot] = None,
+    on_value_changed: Optional[Callable[[float], None]] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QDoubleSpinBox:
     if widget is None:
         widget = QDoubleSpinBox()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if isinstance(range, tuple):
-        widget.setRange(range[0], range[1])
+    if value_range is not None:
+        if not (isinstance(value_range, tuple) and len(value_range) == 2):
+            raise ValueError("value_range must be a tuple of (min, max)")
+        min_value, max_value = value_range
+        if not (
+            isinstance(min_value, (int, float)) and isinstance(max_value, (int, float))
+        ):
+            raise ValueError("min and max values in value_range must be numbers")
+        if min_value > max_value:
+            raise ValueError("min value cannot be greater than max value")
+        widget.setRange(min_value, max_value)
 
     if decimals is not None:
+        if not isinstance(decimals, int) or decimals < 0:
+            raise ValueError("decimals must be a non-negative integer")
         widget.setDecimals(decimals)
 
     if single_step is not None:
@@ -374,222 +648,245 @@ def DoubleSpinBox(
     if value is not None:
         widget.setValue(value)
 
-    if on_value_changed is not None:
-        widget.valueChanged.connect(on_value_changed)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_size
+@set_widget_attribute("setPlaceholderText", "placeholder_text", str)
+@set_widget_attribute("setInputMask", "mask", str)
+@set_widget_attribute("setReadOnly", "read_only", bool)
+@connect_slot("returnPressed", "on_return_pressed")
+@connect_slot("textChanged", "on_text_changed")
 def LineEdit(
     text: Optional[str] = "",
     *,
     placeholder_text: Optional[str] = "",
     max_length: Optional[int] = None,
     mask: Optional[str] = None,
-    on_return_pressed: Optional[Slot] = None,
-    on_text_changed: Optional[Slot] = None,
+    on_return_pressed: Optional[Callable[[], None]] = None,
+    on_text_changed: Optional[Callable[[str], None]] = None,
     widget: Optional[QLineEdit] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
-    read_only: Optional[bool] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
+    read_only: Optional[bool] = None,
 ) -> QLineEdit:
     if widget is None:
         widget = QLineEdit()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    size_ops_set(widget, size_ops)
-
-    if placeholder_text is not None:
-        widget.setPlaceholderText(placeholder_text)
-
-    if mask is not None:
-        widget.setMask(mask)
-
     if max_length is not None:
+        if not isinstance(max_length, int) or max_length <= 0:
+            raise ValueError("max_length must be a positive integer")
         widget.setMaxLength(max_length)
-
-    if on_return_pressed is not None:
-        widget.returnPressed.connect(on_return_pressed)
-
-    if on_text_changed is not None:
-        widget.textChanged.connect(on_text_changed)
-
-    if read_only is not None:
-        widget.setReadOnly(read_only)
 
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_icon
+@set_widget_size
+@connect_slot("released", "on_released")
+@connect_slot("stateChanged", "on_state_changed")
 def CheckBox(
     text: Optional[str] = None,
     *,
     checked: bool = False,
-    on_released: Optional[Slot] = None,  # change the type annotation
-    on_state_changed: Optional[Slot] = None,
+    on_released: Optional[Callable[[], None]] = None,
+    on_state_changed: Optional[Callable[[int], None]] = None,
     widget: Optional[QCheckBox] = None,
     object_name: Optional[str] = None,
     icon: Optional[QIcon] = None,
     icon_size: Optional[Tuple[int, int]] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QCheckBox:
     if widget is None:
         widget = QCheckBox()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    set_widget_icon(widget, icon, icon_size)
-    size_ops_set(widget, size_ops)
-
     widget.setChecked(checked)
-
-    if on_released is not None:
-        widget.released.connect(on_released)
-
-    if on_state_changed is not None:
-        widget.stateChanged.connect(on_state_changed)
 
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_icon
+@set_widget_size
+@connect_slot("currentIndexChanged", "on_index_changed")
 def ComboBox(
     *,
     selected_item: Optional[str] = None,
     items: Optional[List[str]] = None,
-    on_index_changed: Optional[Slot] = None,
+    on_index_changed: Optional[Callable[[int], None]] = None,
     widget: Optional[QComboBox] = None,
     object_name: Optional[str] = None,
     icon: Optional[QIcon] = None,
     icon_size: Optional[Tuple[int, int]] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QComboBox:
+
     if widget is None:
         widget = QComboBox()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_icon(widget, icon, icon_size)
-    size_ops_set(widget, size_ops)
-
     selected_index: int = 0
-    if isinstance(items, list):
+    if items:
         for i, item in enumerate(items):
-            assert isinstance(item, str), "Item must be a string type."
+            if not isinstance(item, str):
+                raise ValueError("All items must be strings.")
             widget.addItem(item)
-
             if item == selected_item:
                 selected_index = i
 
     widget.setCurrentIndex(selected_index)
 
-    if on_index_changed is not None:
-        widget.currentIndexChanged.connect(on_index_changed)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_text
+@set_widget_attribute("setPlaceholderText", "placeholder_text", str)
+@connect_slot("textChanged", "on_text_changed")
 def TextEdit(
     text: Optional[str] = "",
     *,
     placeholder_text: Optional[str] = "",
-    max_length: Optional[int] = None,
-    on_text_changed: Optional[Slot] = None,
+    on_text_changed: Optional[Callable[[], None]] = None,
     widget: Optional[QTextEdit] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QTextEdit:
     if widget is None:
         widget = QTextEdit()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    set_widget_text(widget, text)
-    size_ops_set(widget, size_ops)
-
-    if placeholder_text is not None:
-        widget.setPlaceholderText(placeholder_text)
-
-    if max_length is not None:
-        widget.setMaxLength(max_length)
-
-    if on_text_changed is not None:
-        widget.textChanged.connect(on_text_changed)
-
     return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_attribute("setOrientation", "orientation", Qt.Orientation)
+@set_widget_attribute("setSingleStep", "single_step", int)
+@set_widget_attribute("setPageStep", "page_step", int)
+@set_widget_attribute("setValue", "value", int)
+@connect_slot("valueChanged", "on_value_changed")
 def Slider(
     *,
-    value: Optional[int] = None,
-    minimum: Optional[int] = None,
-    maximum: Optional[int] = None,
-    tick_interval: Optional[int] = None,
-    tick_position: Optional[QSlider.TickPosition] = None,
-    on_release: Optional[Slot] = None,
     orientation: Optional[Qt.Orientation] = Qt.Orientation.Horizontal,
+    value_range: Optional[Tuple[int, int]] = (0, 100),
+    value: int = 0,
+    single_step: int = 1,
+    page_step: int = 10,
+    on_value_changed: Optional[Callable[[int], None]] = None,
     widget: Optional[QSlider] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QSlider:
     if widget is None:
         widget = QSlider()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if tick_interval is not None:
-        widget.setTickInterval(tick_interval)
-
-    if minimum is not None:
-        widget.setMinimum(minimum)
-
-    if maximum is not None:
-        widget.setMaximum(maximum)
-
-    if orientation is not None:
-        widget.setOrientation(orientation)
-
-    if tick_position is not None:
-        widget.setTickPosition(tick_position)
-
-    if value is not None:
-        widget.setValue(value)
-
-    if on_release is not None:
-        widget.sliderReleased.connect(on_release)
+    if value_range is not None:
+        if not (isinstance(value_range, tuple) and len(value_range) == 2):
+            raise ValueError("value_range must be a tuple of (min, max)")
+        min_value, max_value = value_range
+        if not (isinstance(min_value, int) and isinstance(max_value, int)):
+            raise ValueError("min and max values in value_range must be integers")
+        if min_value > max_value:
+            raise ValueError("min value cannot be greater than max value")
+        widget.setRange(min_value, max_value)
 
     return widget
 
 
-def RadioButton() -> QRadioButton:
-    return QRadioButton()
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_text
+@set_widget_icon
+@set_widget_size
+@set_widget_attribute("setChecked", "checked", bool)
+@connect_slot("released", "on_released")
+@connect_slot("toggled", "on_toggled")
+def RadioButton(
+    text: Optional[str] = None,
+    *,
+    checked: bool = False,
+    on_released: Optional[Callable[[], None]] = None,
+    on_toggled: Optional[Callable[[bool], None]] = None,
+    widget: Optional[QRadioButton] = None,
+    object_name: Optional[str] = None,
+    icon: Optional[QIcon] = None,
+    icon_size: Optional[Tuple[int, int]] = None,
+    css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
+) -> QRadioButton:
+    if widget is None:
+        widget = QRadioButton()
+    return widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
 def ListView(
     *,
     widget: Optional[QListView] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QListView:
     if widget is None:
         widget = QListView()
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
     return widget
 
 
+@set_widget_text
+def TableWidgetItem(
+    text: Optional[str] = None,
+    *,
+    widget: Optional[QTableWidgetItem] = None,
+) -> QTableWidgetItem:
+    if widget is None:
+        widget = QTableWidgetItem()
+    return widget
+
+
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_attribute("setRowCount", "row_count", int)
+@set_widget_attribute("setColumnCount", "col_count", int)
+@set_widget_attribute("setHorizontalHeaderLabels", "horizontal_labels", list)
+@connect_slot("itemChanged", "on_item_changed")
 def TableWidget(
     *,
     widget: Optional[QTableWidget] = None,
@@ -597,28 +894,21 @@ def TableWidget(
     col_count: Optional[int] = None,
     horizontal_labels: Optional[List[str]] = None,
     stretch_last_section: Optional[bool] = None,
-    section_resize_mode: Optional[List[Tuple[int, int]]] = None,
-    selection_behavior: Optional[int] = None,
-    selection_mode: Optional[int] = None,
-    column_item_delegates: Optional[List[Tuple[int, QtWidgets.QItemDelegate]]] = None,
-    on_item_changed: Optional[Slot] = None,
+    section_resize_mode: Optional[List[Tuple[int, QHeaderView.ResizeMode]]] = None,
+    selection_behavior: Optional[QAbstractItemView.SelectionBehavior] = None,
+    selection_mode: Optional[QAbstractItemView.SelectionMode] = None,
+    column_item_delegates: Optional[List[Tuple[int, QItemDelegate]]] = None,
+    on_item_changed: Optional[Callable[[QTableWidgetItem], None]] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QTableWidget:
     if widget is None:
         widget = QTableWidget()
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if row_count is not None:
-        widget.setRowCount(row_count)
-    if col_count is not None:
-        widget.setColumnCount(col_count)
-    if horizontal_labels is not None:
-        widget.setHorizontalHeaderLabels(horizontal_labels)
+    # Handle properties that cannot be set via decorators
     if stretch_last_section is not None:
         widget.horizontalHeader().setStretchLastSection(stretch_last_section)
     if section_resize_mode is not None:
@@ -630,67 +920,50 @@ def TableWidget(
         widget.setSelectionMode(selection_mode)
     if column_item_delegates is not None:
         for col, item_delegate in column_item_delegates:
-            widget.setItemDelegateForColumn(0, item_delegate)
-    if on_item_changed is not None:
-        widget.itemChanged.connect(on_item_changed)
-
+            widget.setItemDelegateForColumn(col, item_delegate)
     return widget
 
 
-def TableWidgetItem(
-    text: Optional[str] = None,
-    *,
-    widget: Optional[QSlider] = None,
-    object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
-    css: Optional[str] = None,
-) -> QTableWidgetItem:
-    if widget is None:
-        widget = QTableWidgetItem()
-
-    set_widget_text(widget, text)
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    return widget
-
-
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
 def TreeWidget(
     *,
     widget: Optional[QTreeWidget] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
     css: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
 ) -> QTreeWidget:
     if widget is None:
         widget = QTreeWidget()
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
     return widget
 
 
 def TreeWidgetItem(
     *,
-    widget: Optional[QTableWidgetItem] = None,
-    object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
-    css: Optional[str] = None,
+    widget: Optional[QTreeWidgetItem] = None,
+    text: Optional[str] = None,
+    icon: Optional[QIcon] = None,
 ) -> QTreeWidgetItem:
     if widget is None:
-        widget = QTreeWidgetItem()
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
+        if text is not None:
+            widget = QTreeWidgetItem([text])
+        else:
+            widget = QTreeWidgetItem()
+    if icon is not None:
+        widget.setIcon(0, icon)
     return widget
 
 
 # Icons
+
+ICON_PATHS = {
+    "ma-": ":/material-icons/{name}.png",
+    "i8-": ":/icons8-icons/{name}.svg",
+}
 
 
 def PixmapM(
@@ -698,24 +971,37 @@ def PixmapM(
     *,
     image_size: Optional[Tuple[int, int]] = None,
     color: Optional[Tuple[int, int, int, int]] = None,
-):
-    image_path: Optional[str] = None
-    if image_name.startswith("ma-"):
-        image_path = f":/material-icons/{image_name}.png"
-    elif image_name.startswith("i8-"):
-        image_path = f":/icons8-icons/{image_name}.svg"
-
+) -> QPixmap:
+    image_path = next(
+        (
+            path.format(name=image_name)
+            for prefix, path in ICON_PATHS.items()
+            if image_name.startswith(prefix)
+        ),
+        None,
+    )
     if image_path is None:
-        return None
+        raise ValueError(
+            "Invalid image name. Image name must start with a valid prefix like 'ma-' or 'i8-'."
+        )
 
     pixmap = QPixmap(image_path)
 
     if color is not None:
+
         if isinstance(color, tuple):
-            color = QColor(color[0], color[1], color[2], color[3])
+            if len(color) != 4:
+                raise ValueError("Color must be a tuple of 4 integers (RGBA)")
+            if not all(isinstance(c, int) for c in color):
+                raise ValueError("Color must be a tuple of 4 integers (RGBA)")
+            color = QColor(*color)  # type: ignore
+        elif not isinstance(color, QColor):
+            raise ValueError(
+                "Color must be a tuple of 4 integers (RGBA) or a QColor object"
+            )
 
         painter = QPainter(pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
         painter.fillRect(pixmap.rect(), color)
         del painter
 
@@ -744,25 +1030,26 @@ def IconM(
         icon_size (Optional[Tuple[int, int]]):
         color (Optional[Union[Tuple[int, int, int, int], QColor]]):
     Returns:
-        QIcon: out
+        QIcon: output icon or None
     """
     icon_path: Optional[str] = None
     if icon_name.startswith("ma-"):
         icon_path = f":/material-icons/{icon_name}.png"
     elif icon_name.startswith("i8-"):
         icon_path = f":/icons8-icons/{icon_name}.svg"
-
-    if icon_path is None:
-        return None
+    else:
+        raise ValueError("Invalid icon name. Icon name must start with 'ma-' or 'i8-'.")
 
     pixmap = QPixmap(icon_path)
 
     if color is not None:
         if isinstance(color, tuple):
-            color = QColor(color[0], color[1], color[2], color[3])
+            if len(color) != 4:
+                raise ValueError("Color must be a tuple of 4 integers (RGBA)")
+            color = QColor(*color)
 
         painter = QPainter(pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
         painter.fillRect(pixmap.rect(), color)
         del painter
 
@@ -778,11 +1065,14 @@ def IconM(
 # Action
 
 
+@set_widget_text
+@set_widget_shortcut
+@set_widget_icon
 def Action(
     text: Optional[str] = None,
     *,
     icon: Optional[QIcon] = None,
-    triggered: Optional[Slot] = None,
+    triggered: Optional[Callable[[], None]] = None,
     shortcut: Optional[
         Union[
             QKeySequence,
@@ -794,23 +1084,18 @@ def Action(
     ] = None,
     parent: Optional[QObject] = None,
 ) -> QAction:
-    action = QAction(text, parent=parent)
+    action = QAction(parent=parent)
 
-    if shortcut is not None:
-        action.setShortcut(shortcut)
+    if triggered is not None:
+        if not callable(triggered):
+            raise TypeError("triggered must be a callable")
 
-    if icon is not None:
-        action.setIcon(icon)
-
-    if triggered:
         action.triggered.connect(triggered)
 
     return action
 
 
-# Menu
-
-
+@set_widget_style_sheet
 def Menu(
     title: str,
     *,
@@ -818,8 +1103,6 @@ def Menu(
     css: Optional[str] = None,
 ) -> QMenu:
     menu = QMenu(title)
-
-    set_widget_style_sheet(menu, css)
 
     if isinstance(items, list):
         for item in items:
@@ -830,17 +1113,18 @@ def Menu(
                 menu.addMenu(item)
             elif isinstance(item, QAction):
                 menu.addAction(item)
+            else:
+                raise TypeError("Unsupported menu item type")
 
     return menu
 
 
+@set_widget_style_sheet
 def MenuBar(
     *menus,
     css: Optional[str] = None,
 ) -> QMenuBar:
     menubar = QMenuBar()
-
-    set_widget_style_sheet(menubar, css)
 
     for menu in menus:
         menubar.addMenu(menu)
@@ -857,7 +1141,7 @@ class ToolBarNextLine:
 
 def ToolBar(
     title: Optional[str] = None,
-    items: Optional[List[Union[QAction, QMenu]]] = None,
+    items: Optional[List[Union[QAction, QMenu, QWidget]]] = None,
 ) -> QToolBar:
     toolbar = QToolBar(title)
 
@@ -867,6 +1151,8 @@ def ToolBar(
                 toolbar.addAction(item)
             elif isinstance(item, QWidget):
                 toolbar.addWidget(item)
+            else:
+                raise TypeError("Unsupported toolbar item type")
 
     return toolbar
 
@@ -885,29 +1171,29 @@ def StatusBar(
                 statusbar.addAction(item)
             elif isinstance(item, QWidget):
                 statusbar.addWidget(item)
+            else:
+                raise TypeError("Unsupported status bar item type")
 
     return statusbar
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_attribute("setWindowTitle", "title", str)
+@set_widget_attribute("setWidget", "widget", QWidget)
 def DockWidget(
     title: Optional[str] = None,
     widget: Optional[QWidget] = None,
     *,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QDockWidget:
     dock: QDockWidget = QDockWidget()
-
-    set_widget_object_name(dock, object_name)
-    set_widget_style_sheet(dock, css)
-    size_ops_set(dock, size_ops)
-
-    if title is not None:
-        dock.setWindowTitle(title)
-
-    if widget is not None:
-        dock.setWidget(widget)
 
     return dock
 
@@ -925,7 +1211,8 @@ class DockWidgetSized(QDockWidget):
         if parent is not None:
             self.setParent(parent)
         self.setWindowTitle(title)
-        self.setWidget(widget)
+        if widget is not None:
+            self.setWidget(widget)
         self._hint_width, self._hint_height = size_hint[:2]
 
     def set_hint_size(self, w: int, h: int) -> None:
@@ -944,6 +1231,9 @@ class DockWidgetSized(QDockWidget):
 # Layouts
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
 def Splitter(
     widgets: Optional[List[QWidget]] = None,
     *,
@@ -951,16 +1241,15 @@ def Splitter(
     splitter: Optional[QSplitter] = None,
     orientation: Optional[Qt.Orientation] = Qt.Orientation.Horizontal,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
     margin: Optional[int] = None,
 ) -> QSplitter:
     if splitter is None:
         splitter = QSplitter()
-
-    set_widget_object_name(splitter, object_name)
-    set_widget_style_sheet(splitter, css)
-    size_ops_set(splitter, size_ops)
 
     if margin is not None:
         splitter.setContentsMargins(margin, margin, margin, margin)
@@ -982,11 +1271,16 @@ def SpacerItem(
     *,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    horizontal_policy: Optional[int] = SizePolicy.Expanding,
-    vertical_policy: Optional[int] = SizePolicy.Expanding,
+    horizontal_policy: Optional[QSizePolicy.Policy] = SizePolicy.Expanding,
+    vertical_policy: Optional[QSizePolicy.Policy] = SizePolicy.Expanding,
     widget: Optional[QSpacerItem] = None,
-) -> None:
-    widget = QSpacerItem(width, height, horizontal_policy, vertical_policy)
+) -> QSpacerItem:
+    widget = QSpacerItem(
+        width if width is not None else 0,
+        height if height is not None else 0,
+        horizontal_policy if horizontal_policy is not None else SizePolicy.Expanding,
+        vertical_policy if vertical_policy is not None else SizePolicy.Expanding,
+    )
 
     return widget
 
@@ -1009,6 +1303,8 @@ def HSpacer() -> QSpacerItem:
     )
 
 
+@set_widget_object_name
+@set_widget_style_sheet
 def ScrollArea(
     *,
     scroll_area: Optional[QScrollArea] = None,
@@ -1021,9 +1317,6 @@ def ScrollArea(
     if scroll_area is None:
         scroll_area = QScrollArea(parent)
 
-    set_widget_object_name(scroll_area, object_name)
-    set_widget_style_sheet(scroll_area, css)
-
     if widget is not None:
         scroll_area.setWidget(widget)
 
@@ -1033,6 +1326,25 @@ def ScrollArea(
     return scroll_area
 
 
+# layouts
+
+
+ItemType = Union[QWidget, QLayout, QSpacerItem]
+ItemWithStretch = Tuple[ItemType, int]
+
+
+# Define special layout commands as unique singleton objects
+class _LayoutCommand:
+    pass
+
+
+NextColumn = _LayoutCommand()
+NextRow = _LayoutCommand()
+AddStretch = _LayoutCommand()
+AddStretchLayout = _LayoutCommand()
+
+
+# Alignment helper class
 class Align:
     Top: Final = Qt.AlignmentFlag.AlignTop
     Bottom: Final = Qt.AlignmentFlag.AlignBottom
@@ -1042,110 +1354,156 @@ class Align:
     VCenter: Final = Qt.AlignmentFlag.AlignVCenter
 
 
-def _set_layout_props(
+def set_layout_props(
     layout: QLayout,
-    align: Optional[int] = None,
+    align: Optional[Qt.AlignmentFlag] = None,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
 ) -> None:
+    """
+    Set properties for a layout.
+
+    Args:
+        layout (QLayout): The layout to configure.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment flags.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+    """
     if align is not None:
         layout.setAlignment(align)
     if spacing is not None:
         layout.setSpacing(spacing)
     if margin is not None:
-        layout.setContentsMargins(margin, margin, margin, margin)
+        if isinstance(margin, int):
+            layout.setContentsMargins(margin, margin, margin, margin)
+        elif isinstance(margin, (tuple, list)) and len(margin) == 4:
+            layout.setContentsMargins(*margin)
+        else:
+            raise ValueError("margin must be an int or a tuple/list of four ints")
 
 
 def VBox(
-    *items,
-    align: Optional[int] = Align.Top,
+    *items: Union[ItemType, ItemWithStretch, _LayoutCommand],
+    align: Optional[Qt.AlignmentFlag] = Align.Top,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
-    stretch_factor: Optional[int] = 0,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
+    default_stretch: int = 0,
 ) -> QVBoxLayout:
-    box = QVBoxLayout()
-    _set_layout_props(box, align, spacing, margin)
-    for item in items:
-        stretch = stretch_factor
-        if isinstance(item, (tuple, list)):
-            assert len(item) == 2
-            stretch = item[1]
-            item = item[0]
+    """
+    Create a vertical box layout with the given items.
 
+    Args:
+        *items: Items to add to the layout. Can be QWidget, QLayout, QSpacerItem,
+                or a tuple (item, stretch). Use AddStretch to add stretch.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the layout.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+        default_stretch (int): Default stretch factor for items without specified stretch.
+
+    Returns:
+        QVBoxLayout: The configured vertical box layout.
+    """
+    box = QVBoxLayout()
+    set_layout_props(box, align=align, spacing=spacing, margin=margin)
+    for item in items:
+        stretch = default_stretch
+        if isinstance(item, tuple):
+            if len(item) != 2 or not isinstance(item[1], int):
+                raise ValueError("Item tuple must be (item, stretch:int)")
+            item, stretch = item
         if isinstance(item, QWidget):
             box.addWidget(item, stretch)
         elif isinstance(item, QLayout):
             box.addLayout(item, stretch)
+        elif isinstance(item, QSpacerItem):
+            box.addItem(item)
+        elif item is AddStretch:
+            box.addStretch()
         else:
-            print("Error adding item: type is not acceptable", item)
+            raise TypeError(f"Unsupported item type in VBox: {type(item)}")
     return box
 
 
 def HBox(
-    *items,
-    align: Optional[int] = Align.Top,
+    *items: Union[ItemType, ItemWithStretch, _LayoutCommand],
+    align: Optional[Qt.AlignmentFlag] = Align.Left,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
-    stretch_factor: Optional[int] = 0,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
+    default_stretch: int = 0,
 ) -> QHBoxLayout:
-    box = QHBoxLayout()
-    _set_layout_props(box, align, spacing, margin)
-    for item in items:
-        stretch = stretch_factor
-        if isinstance(item, (tuple, list)):
-            assert len(item) == 2
-            stretch = item[1]
-            item = item[0]
+    """
+    Create a horizontal box layout with the given items.
 
+    Args:
+        *items: Items to add to the layout. Can be QWidget, QLayout, QSpacerItem,
+                or a tuple (item, stretch). Use AddStretch to add stretch.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the layout.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+        default_stretch (int): Default stretch factor for items without specified stretch.
+
+    Returns:
+        QHBoxLayout: The configured horizontal box layout.
+    """
+    box = QHBoxLayout()
+    set_layout_props(box, align=align, spacing=spacing, margin=margin)
+    for item in items:
+        stretch = default_stretch
+        if isinstance(item, tuple):
+            if len(item) != 2 or not isinstance(item[1], int):
+                raise ValueError("Item tuple must be (item, stretch:int)")
+            item, stretch = item
         if isinstance(item, QWidget):
             box.addWidget(item, stretch)
         elif isinstance(item, QLayout):
             box.addLayout(item, stretch)
+        elif isinstance(item, QSpacerItem):
+            box.addItem(item)
+        elif item is AddStretch:
+            box.addStretch()
         else:
-            print("Error adding item: type is not acceptable", item)
+            raise TypeError(f"Unsupported item type in HBox: {type(item)}")
     return box
 
 
-class NextColumn:
-    pass
-
-
-class NextRow:
-    pass
-
-
-class AddStretch:
-    pass
-
-
-class AddStretchLayout:
-    pass
-
-
 def Columns(
-    *items,
-    align: Optional[int] = None,
+    *items: Union[ItemType, ItemWithStretch, _LayoutCommand],
+    align: Optional[Qt.AlignmentFlag] = None,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
-    stretch_factor: int = 0,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
+    default_stretch: int = 0,
 ) -> QHBoxLayout:
-    box = QHBoxLayout()
-    _set_layout_props(box, align, spacing, margin)
+    """
+    Create a layout with multiple columns.
 
-    init_layout = True
+    Args:
+        *items: Items to add to the layout. Use NextColumn to start a new column.
+                Items can be QWidget, QLayout, QSpacerItem, or a tuple (item, stretch).
+                Use AddStretch to add stretch within a column.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the layout.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+        default_stretch (int): Default stretch factor for columns without specified stretch.
+
+    Returns:
+        QHBoxLayout: The configured columns layout.
+    """
+    box = QHBoxLayout()
+    set_layout_props(box, align=align, spacing=spacing, margin=margin)
     layout_item = None
     for item in items:
-        stretch = stretch_factor
+        stretch = default_stretch
+        if isinstance(item, tuple):
+            if len(item) != 2 or not isinstance(item[1], int):
+                raise ValueError("Item tuple must be (item, stretch:int)")
+            item, stretch = item
 
-        if isinstance(item, (tuple, list)):
-            assert len(item) == 2, "Item"
-            stretch = item[1]
-            item = item[0]
-        if item == NextColumn or init_layout:
-            init_layout = False
+        if item is NextColumn or layout_item is None:
             layout_item = QVBoxLayout()
-            _set_layout_props(layout_item, align, spacing, margin)
+            set_layout_props(layout_item, align=align, spacing=spacing, margin=margin)
             box.addLayout(layout_item, stretch)
+            if item is NextColumn:
+                continue
 
         if isinstance(item, QWidget):
             layout_item.addWidget(item, stretch)
@@ -1153,38 +1511,53 @@ def Columns(
             layout_item.addLayout(item, stretch)
         elif isinstance(item, QSpacerItem):
             layout_item.addItem(item)
-
-        elif item == AddStretch:
+        elif item is AddStretch:
             layout_item.addStretch()
-        elif item == AddStretchLayout:
+        elif item is AddStretchLayout:
             box.addStretch()
-
+        else:
+            raise TypeError(f"Unsupported item type in Columns: {type(item)}")
     return box
 
 
 def Rows(
-    *items,
-    align: Optional[int] = None,
+    *items: Union[ItemType, ItemWithStretch, _LayoutCommand],
+    align: Optional[Qt.AlignmentFlag] = None,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
-    stretch_factor: int = 0,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
+    default_stretch: int = 0,
 ) -> QVBoxLayout:
+    """
+    Create a layout with multiple rows.
+
+    Args:
+        *items: Items to add to the layout. Use NextRow to start a new row.
+                Items can be QWidget, QLayout, QSpacerItem, or a tuple (item, stretch).
+                Use AddStretch to add stretch within a row.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the layout.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+        default_stretch (int): Default stretch factor for rows without specified stretch.
+
+    Returns:
+        QVBoxLayout: The configured rows layout.
+    """
     box = QVBoxLayout()
-    _set_layout_props(box, align, spacing, margin)
-    init_layout = True
+    set_layout_props(box, align=align, spacing=spacing, margin=margin)
     layout_item = None
     for item in items:
-        stretch = stretch_factor
+        stretch = default_stretch
+        if isinstance(item, tuple):
+            if len(item) != 2 or not isinstance(item[1], int):
+                raise ValueError("Item tuple must be (item, stretch:int)")
+            item, stretch = item
 
-        if isinstance(item, (tuple, list)):
-            assert len(item) == 2, "Item"
-            stretch = item[1]
-            item = item[0]
-        if item == NextRow or init_layout:
-            init_layout = False
+        if item is NextRow or layout_item is None:
             layout_item = QHBoxLayout()
-            _set_layout_props(layout_item, align, spacing, margin)
+            set_layout_props(layout_item, align=align, spacing=spacing, margin=margin)
             box.addLayout(layout_item, stretch)
+            if item is NextRow:
+                continue
 
         if isinstance(item, QWidget):
             layout_item.addWidget(item, stretch)
@@ -1192,76 +1565,100 @@ def Rows(
             layout_item.addLayout(item, stretch)
         elif isinstance(item, QSpacerItem):
             layout_item.addItem(item)
-
-        elif item == AddStretch:
+        elif item is AddStretch:
             layout_item.addStretch()
-        elif item == AddStretchLayout:
+        elif item is AddStretchLayout:
             box.addStretch()
-
+        else:
+            raise TypeError(f"Unsupported item type in Rows: {type(item)}")
     return box
 
 
-def set_uniform_label_width(form_layout):
+def set_uniform_label_width(form_layout: QFormLayout) -> None:
+    """
+    Set a uniform width for all labels in a QFormLayout.
+
+    Args:
+        form_layout (QFormLayout): The form layout to adjust.
+    """
     max_width = 0
-
-    # Iterate over all rows in the form layout
+    # Find the maximum label width
     for i in range(form_layout.rowCount()):
-        widget = form_layout.itemAt(i, QFormLayout.LabelRole).widget()
-
-        # Check if the widget is a QLabel
+        widget = form_layout.itemAt(i, QFormLayout.ItemRole.LabelRole).widget()
         if isinstance(widget, QLabel):
             max_width = max(max_width, widget.sizeHint().width())
     max_width = int(max_width * 1.1)
     # Set the maximum width to all QLabel widgets
     for i in range(form_layout.rowCount()):
-        widget = form_layout.itemAt(i, QFormLayout.LabelRole).widget()
+        widget = form_layout.itemAt(i, QFormLayout.ItemRole.LabelRole).widget()
         if isinstance(widget, QLabel):
             widget.setFixedWidth(max_width)
 
 
 def Form(
-    *items: List[Tuple[Union[str, QLabel], QWidget]],
-    align: Optional[int] = None,
+    *items: Tuple[Union[str, QLabel], QWidget],
+    align: Optional[Qt.AlignmentFlag] = None,
     spacing: Optional[int] = None,
-    margin: Optional[int] = None,
-    label_align: int = Align.Right,
+    margin: Optional[Union[int, Tuple[int, int, int, int]]] = None,
+    label_align: Optional[Qt.AlignmentFlag] = Align.Right,
     uniform_label_width: bool = True,
 ) -> QFormLayout:
+    """
+    Create a form layout with labels and corresponding widgets.
+
+    Args:
+        *items: Tuples of (label, widget). The label can be a string or QLabel.
+        align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the form layout.
+        spacing (Optional[int]): Spacing between items.
+        margin (Optional[Union[int, Tuple[int, int, int, int]]]): Margin around the layout.
+        label_align (Optional[Union[Qt.AlignmentFlag, int]]): Alignment for the labels.
+        uniform_label_width (bool): Whether to set a uniform width for all labels.
+
+    Returns:
+        QFormLayout: The configured form layout.
+    """
     box = QFormLayout()
-    _set_layout_props(box, align, spacing, margin)
+    set_layout_props(box, align=align, spacing=spacing, margin=margin)
 
-    for text, item in items:
+    for text, widget in items:
         if isinstance(text, str):
-            label = Label(text)
-        if isinstance(text, QLabel):
-            label.setAlignment(label_align)
-        box.addRow(label, item)
+            label = QLabel(text)
+            if label_align is not None:
+                label.setAlignment(label_align)
+        elif isinstance(text, QLabel):
+            label = text
+            if label_align is not None:
+                label.setAlignment(label_align)
+        else:
+            raise TypeError("Label must be either a string or a QLabel instance")
+        box.addRow(label, widget)
 
-    box.setLabelAlignment(label_align)
+    if label_align is not None:
+        box.setLabelAlignment(label_align)
     if uniform_label_width:
         set_uniform_label_width(box)
     return box
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_attribute("setLayout", "layout", QLayout)
 def GroupBox(
     title: str,
     *,
     widget: Optional[QGroupBox] = None,
-    layout: Optional[QGroupBox] = None,
+    layout: Optional[QLayout] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QGroupBox:
     if widget is None:
         widget = QGroupBox(title)
     widget.setTitle(title)
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if layout is not None:
-        widget.setLayout(layout)
 
     return widget
 
@@ -1269,41 +1666,42 @@ def GroupBox(
 # Frame
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
+@set_widget_attribute("setLayout", "layout", QLayout)
 def Frame(
     *,
     widget: Optional[QFrame] = None,
     layout: Optional[QLayout] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QFrame:
     if widget is None:
         widget = QFrame()
 
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if layout is not None:
-        widget.setLayout(layout)
-
     return widget
 
 
-def HLine() -> QFrame:
+def HLine(*, fixed_height: int = 2) -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.Shape.HLine)
-
     line.setFrameShadow(QFrame.Shadow.Sunken)
-    line.setFixedHeight(2)
+    line.setFixedHeight(fixed_height)
     line.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
     return line
 
 
 # Stacked Widget
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@set_widget_size
 def StackedWidget(
     *,
     widget: Optional[QStackedWidget] = None,
@@ -1312,15 +1710,14 @@ def StackedWidget(
     current_page_index: Optional[int] = None,
     current_page: Optional[QWidget] = None,
     object_name: Optional[str] = None,
-    size_ops: Optional[SizeOps] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     css: Optional[str] = None,
 ) -> QStackedWidget:
     if widget is None:
         widget = QStackedWidget()
-
-    set_widget_object_name(widget, object_name)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
 
     if layout is not None:
         widget.setLayout(layout)
@@ -1340,13 +1737,23 @@ def StackedWidget(
 # Window
 
 
+@set_widget_object_name
+@set_widget_style_sheet
+@window_ops_set
+@set_widget_size
+@set_widget_attribute("setLayout", "layout", QLayout)
+@call_widget_method("show")
 def Widget(
     *,
     widget: Optional[QWidget] = None,
     layout: Optional[QLayout] = None,
     object_name: Optional[str] = None,
-    window_ops: Optional[WindowOps] = None,
-    size_ops: Optional[SizeOps] = None,
+    window_size: Optional[Tuple[int, int]] = None,
+    window_title: Optional[str] = None,
+    min_width: Optional[int] = None,
+    max_width: Optional[int] = None,
+    min_height: Optional[int] = None,
+    max_height: Optional[int] = None,
     show: bool = False,
     css: Optional[str] = None,
 ) -> QWidget:
@@ -1356,34 +1763,27 @@ def Widget(
     if layout is not None:
         widget.setLayout(layout)
 
-    set_widget_object_name(widget, object_name)
-    window_ops_set(widget, window_ops)
-    set_widget_style_sheet(widget, css)
-    size_ops_set(widget, size_ops)
-
-    if show:
-        widget.show()
-
     return widget
 
 
+@window_ops_set
+@set_widget_style_sheet
+@call_widget_method("show")
 def MainWindow(
     *,
     widget: Optional[QMainWindow] = None,
-    window_ops: Optional[WindowOps] = None,
+    window_size: Optional[Tuple[int, int]] = None,
+    window_title: Optional[str] = None,
     central_widget: Optional[QWidget] = None,
-    docks: Optional[List[Tuple[int, QDockWidget]]] = None,
+    docks: Optional[List[Tuple[Qt.DockWidgetArea, QDockWidget]]] = None,
     menubar: Optional[QMenuBar] = None,
-    toolbars: Optional[List[QToolBar]] = None,
+    toolbars: Optional[List[Union[QToolBar, ToolBarNextLine]]] = None,
     statusbar: Optional[QStatusBar] = None,
     css: Optional[str] = None,
     show: bool = False,
 ) -> QMainWindow:
     if widget is None:
         widget = QMainWindow()
-
-    window_ops_set(widget, window_ops)
-    set_widget_style_sheet(widget, css)
 
     if isinstance(central_widget, QWidget):
         widget.setCentralWidget(central_widget)
@@ -1399,14 +1799,13 @@ def MainWindow(
         for toolbar in toolbars:
             if toolbar == ToolBarNextLine:
                 widget.addToolBarBreak()
-            else:
+            elif isinstance(toolbar, QToolBar):
                 widget.addToolBar(toolbar)
+            else:
+                raise TypeError("Unsupported toolbar type")
 
     if statusbar is not None:
         widget.setStatusBar(statusbar)
-
-    if show:
-        widget.show()
 
     return widget
 
@@ -1415,18 +1814,18 @@ def MainWindow(
 
 
 def Alert(
+    parent: QWidget,
     title: str,
     message: str,
-    parent: Optional[QWidget] = None,
 ) -> None:
     QMessageBox.warning(parent, title, message, QMessageBox.StandardButton.Ok)
 
 
 def Error(
+    parent: QWidget,
     title: str,
     message: str,
-    parent: Optional[QWidget] = None,
-    msg_type: Optional[str] = None,
+    msg_type: Literal["Error", "Warning", "Info"] = "Error",
     modal: bool = False,
 ) -> QErrorMessage:
     err = QErrorMessage(parent)
@@ -1437,44 +1836,46 @@ def Error(
 
 
 def Confirm(
+    parent: QWidget,
     title: str,
     message: str,
-    parent: Optional[QWidget] = None,
 ) -> bool:
     reply = QMessageBox.question(
         parent,
         title,
         message,
-        QMessageBox.Yes | QMessageBox.Cancel,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
     )
-    return reply == QMessageBox.Yes
+    return reply == QMessageBox.StandardButton.Yes
 
 
 def Color(
-    title: str = None,
+    title: str = "Select Color",
     color: Union[Tuple[int, int, int], Tuple[int, int, int, int], QColor] = (
         77,
         77,
         77,
     ),
     parent: Optional[QWidget] = None,
-) -> QColor | None:
-    initial: QColor | None = None
+) -> Optional[QColor]:
+    initial: Optional[QColor] = None
     if isinstance(color, QColor):
         initial = color
     elif isinstance(color, tuple):
-        for c in color:
-            assert isinstance(c, int) and 0 <= c <= 255
+        if not all(isinstance(c, int) and 0 <= c <= 255 for c in color):
+            raise ValueError("Color components must be integers between 0 and 255")
         if len(color) == 4:
-            initial = QColor(color[0], color[1], color[2], color[3])
+            initial = QColor(*color)
+        elif len(color) == 3:
+            initial = QColor(*color)
         else:
-            initial = QColor(color[0], color[1], color[2])
+            raise ValueError("Color tuple must have 3 or 4 elements")
 
     color = QColorDialog.getColor(
         initial,
         parent,
         title,
-        QColorDialog.ShowAlphaChannel,
+        QColorDialog.ColorDialogOption.ShowAlphaChannel,
         # | QColorDialog.NoButtons | QColorDialog.DontUseNativeDialog
     )
     if color.isValid():
@@ -1483,15 +1884,24 @@ def Color(
 
 
 def OpenFile(
-    title: Optional[str] = "Open File...",
-    file_filter: Optional[str] = "All Files(*);;Text Files (*.txt)",
+    parent: QWidget,
+    title: str = "Open File...",
+    file_filter: str = "All Files(*);;Text Files (*.txt)",
     directory: Optional[str] = None,
-    parent: Optional[QWidget] = None,
     native: bool = True,
+    use_last_path: bool = False,
 ) -> Optional[str]:
     options = QFileDialog.Option()
     if not native:
         options = QFileDialog.Option.DontUseNativeDialog
+
+    if use_last_path and OpenFiles.last_path:
+        directory = OpenFiles.last_path
+    elif directory is None:
+        directory = ""
+
+    if not isinstance(directory, str):
+        raise ValueError("Invalid directory path")
 
     file_path, _ = QFileDialog.getOpenFileName(
         parent,
@@ -1502,21 +1912,34 @@ def OpenFile(
     )
 
     if file_path:
+        OpenFile.last_path = os.path.dirname(file_path).replace(os.sep, "/")
         return file_path.replace(os.sep, "/")
 
     return None
 
 
+OpenFile.last_path = ""
+
+
 def OpenFiles(
-    title: Optional[str] = "Open File...",
-    file_filter: Optional[str] = "All Files(*);;Text Files (*.txt)",
+    parent: QWidget,
+    title: str = "Open File...",
+    file_filter: str = "All Files(*);;Text Files (*.txt)",
     directory: Optional[str] = None,
-    parent: Optional[QWidget] = None,
     native: bool = True,
-) -> List[str] | None:
+    use_last_path: bool = False,
+) -> Optional[List[str]]:
     options = QFileDialog.Option()
     if not native:
         options = QFileDialog.Option.DontUseNativeDialog
+
+    if use_last_path and OpenFiles.last_path:
+        directory = OpenFiles.last_path
+    elif directory is None:
+        directory = ""
+
+    if not isinstance(directory, str):
+        raise ValueError("Invalid directory path")
 
     files, _ = QFileDialog.getOpenFileNames(
         parent,
@@ -1526,24 +1949,37 @@ def OpenFiles(
         options=options,
     )
 
-    output: List[str] = list()
-    if files:
+    output: List[str] = []
+    if files and len(files) > 0:
         for file_path in files:
             output.append(file_path.replace(os.sep, "/"))
+        OpenFiles.last_path = os.path.dirname(files[0]).replace(os.sep, "/")
         return sorted(output)
     return output
 
 
+OpenFiles.last_path = ""
+
+
 def SaveFile(
-    title: Optional[str] = "Open File...",
+    parent: QWidget,
+    title: str = "Save File...",
     directory: Optional[str] = None,
-    file_filter: Optional[str] = "All Files(*);;Text Files (*.txt)",
-    parent: Optional[QWidget] = None,
+    file_filter: str = "All Files(*);;Text Files (*.txt)",
     native: bool = True,
+    use_last_path: bool = False,
 ) -> Optional[str]:
     options = QFileDialog.Option()
     if not native:
         options = QFileDialog.Option.DontUseNativeDialog
+
+    if use_last_path and SaveFile.last_path:
+        directory = SaveFile.last_path
+    elif directory is None:
+        directory = ""
+
+    if not isinstance(directory, str):
+        raise ValueError("Invalid directory path")
 
     file_path, _ = QFileDialog.getSaveFileName(
         parent,
@@ -1554,17 +1990,22 @@ def SaveFile(
     )
 
     if file_path:
+        SaveFile.last_path = os.path.dirname(file_path).replace(os.sep, "/")
         return file_path.replace(os.sep, "/")
 
     return None
 
 
+SaveFile.last_path = ""
+
+
 def OpenDir(
-    title: Optional[str] = "Open Directory...",
+    parent: QWidget,
+    title: str = "Open Directory...",
     directory: Optional[str] = None,
-    parent: Optional[QWidget] = None,
     show_dirs_only: bool = True,
     native: bool = True,
+    use_last_path: bool = False,
 ) -> Optional[str]:
     options = QFileDialog.Option()
     if not native:
@@ -1574,38 +2015,312 @@ def OpenDir(
     else:
         options &= ~QFileDialog.Option.ShowDirsOnly
 
-    dir_path = QFileDialog().getExistingDirectory(
-        parent, caption=title, dir=directory, options=options
+    if use_last_path and OpenDir.last_path:
+        directory = OpenDir.last_path
+    elif directory is None:
+        directory = ""
+
+    if not isinstance(directory, str):
+        raise ValueError("Invalid directory path")
+
+    dir_path = QFileDialog.getExistingDirectory(
+        parent, title, directory, options=options
     )
 
     if dir_path:
+        OpenDir.last_path = dir_path.replace(os.sep, "/")
         return dir_path.replace(os.sep, "/")
 
     return None
 
 
-# Application
+OpenDir.last_path = ""
+
+
+# Timer
+
+
+def Timer(
+    *,
+    interval_ms: int = 1000,
+    single_shot: bool = False,
+    on_timeout: Optional[Callable[[], None]] = None,
+    auto_start: bool = False,
+) -> QTimer:
+    timer = QTimer()
+    timer.setInterval(interval_ms)
+    timer.setSingleShot(single_shot)
+    if on_timeout is not None:
+        if not callable(on_timeout):
+            raise TypeError("on_timeout must be a callable")
+        timer.timeout.connect(on_timeout)
+    if auto_start:
+        timer.start()
+
+    return timer
+
+
+# Logger Widget
+
+
+class LogLevel(Enum):
+    ERROR = ("ma-error-black", "Error")
+    WARNING = ("ma-warning-black", "Warning")
+    INFO = ("ma-info-black", "Info")
+    DEBUG = ("ma-terminal-black", "Debug")
+    
+    def __init__(self, icon_path, display_name):
+        self.icon_path = icon_path
+        self.display_name = display_name
+
+    def __str__(self):
+        return self.display_name
+
+
+class LoggerIcons:
+    
+    ERROR: QIcon
+    WARNING: QIcon
+    INFO: QIcon
+    DEBUG: QIcon
+    
+    _initialized: bool = False
+    
+    @classmethod
+    def initialize(cls) -> None:
+        if cls._initialized:
+            return
+        cls._initialized = True
+        cls.ERROR = IconM("ma-error-black", color=(255, 0, 0, 255))
+        cls.WARNING = IconM("ma-warning-black", color=(255, 150, 0, 255))
+        cls.INFO = IconM("ma-info-black", color=(0, 200, 0, 255))
+        cls.DEBUG = IconM("ma-info-black", color=(0, 200, 255, 255))
+        
+    @classmethod
+    def get_icon(cls, level: "LogLevel") -> QIcon:
+        cls.initialize()
+        
+        if level == LogLevel.ERROR:
+            return cls.ERROR
+        elif level == LogLevel.WARNING:
+            return cls.WARNING
+        elif level == LogLevel.INFO:
+            return cls.INFO
+        elif level == LogLevel.DEBUG:
+            return cls.DEBUG
+
+
+class LoggerContext(QObject):
+    """Handles logging messages from different sources and emits signals"""
+
+    message_logged = Signal(str, str, str, str)  # timestamp, level, source, message
+
+    def __init__(
+        self, output_logger_file_path: Optional[str] = None, enable_console: bool = True
+    ):
+        super().__init__()
+        self._output_logger_file_path = output_logger_file_path
+        self._enable_console = enable_console
+        self._setup_logging()
+
+    def _setup_logging(self):
+        """Configure logging handlers"""
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+
+        class SignalHandler(logging.Handler):
+            def __init__(self, context):
+                super().__init__()
+                self.context = context
+
+            def emit(self, record):
+                timestamp = datetime.fromtimestamp(record.created).strftime(
+                    "%H:%M:%S.%f"
+                )[:-3]
+                level = record.levelname
+                source = record.name
+                msg = self.format(record)
+                self.context.message_logged.emit(timestamp, level, source, msg)
+
+        signal_handler = SignalHandler(self)
+        signal_formatter = logging.Formatter("%(message)s")
+        signal_handler.setFormatter(signal_formatter)
+        logger.addHandler(signal_handler)
+
+        if self._enable_console:
+            console_handler = logging.StreamHandler()
+
+            class ColorFormatter(logging.Formatter):
+                COLORS = {
+                    "ERROR": "\033[91m",  # Red
+                    "WARNING": "\033[93m",  # Yellow
+                    "INFO": "\033[92m",  # Green
+                    "DEBUG": "\033[94m",  # Blue
+                    "RESET": "\033[0m",  # Reset
+                }
+
+                def format(self, record):
+                    color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
+                    record.levelname = (
+                        f"{color}{record.levelname}{self.COLORS['RESET']}"
+                    )
+                    record.name = (
+                        f"\033[95m{record.name}{self.COLORS['RESET']}"  # Magenta
+                    )
+                    record.msg = f"{self.COLORS['RESET']}{record.msg}"
+                    return super().format(record)
+
+            console_formatter = ColorFormatter(
+                "[%(asctime)s] [%(name)s] [%(levelname)s]: %(message)s"
+            )
+            console_handler.setFormatter(console_formatter)
+            logger.addHandler(console_handler)
+
+        # Add file handler if path is provided
+        if self._output_logger_file_path:
+            file_handler = logging.FileHandler(self._output_logger_file_path)
+            file_formatter = logging.Formatter(
+                "[%(asctime)s] [%(name)s] [%(levelname)s]: %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+            logger.addHandler(file_handler)
+
+    def log(self, level: LogLevel, source: str, message: Any):
+        """Log a message with the specified level and source"""
+        msg = str(message)
+        logger = logging.getLogger(source)
+
+        if level == LogLevel.ERROR:
+            logger.error(msg)
+        elif level == LogLevel.WARNING:
+            logger.warning(msg)
+        elif level == LogLevel.INFO:
+            logger.info(msg)
+        elif level == LogLevel.DEBUG:
+            logger.debug(msg)
+
+    def error(self, source: str, message: Any):
+        self.log(LogLevel.ERROR, source, message)
+
+    def warning(self, source: str, message: Any):
+        self.log(LogLevel.WARNING, source, message)
+
+    def info(self, source: str, message: Any):
+        self.log(LogLevel.INFO, source, message)
+
+    def debug(self, source: str, message: Any):
+        self.log(LogLevel.DEBUG, source, message)
+
+class LoggerWidget(QWidget):
+    """Widget that displays log messages in a table format"""
+
+    def __init__(self, logger_context: LoggerContext, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.logger_context = logger_context
+        self.auto_scroll = True
+        self._setup_ui()
+        self._connect_signals()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Create table widget
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Time", "Source", "Level", "Message"])
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        # Configure table properties
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+
+        self.table.verticalHeader().setVisible(False)
+        self.table.setWordWrap(True)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+
+        layout.addWidget(self.table)
+
+    def _connect_signals(self):
+        self.logger_context.message_logged.connect(self._add_log_entry)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
+
+    def _add_log_entry(self, timestamp: str, level: str, source: str, message: str):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        level_item = QTableWidgetItem(LogLevel[level].display_name)
+        #level_item.setIcon(QIcon(LogLevel[level].icon_path))
+        level_item.setIcon(LoggerIcons.get_icon(LogLevel[level]))
+
+        items = [
+            QTableWidgetItem(timestamp),
+            QTableWidgetItem(source),
+            level_item,
+            QTableWidgetItem(message),
+        ]
+
+        # Set items
+        for col, item in enumerate(items):
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(row, col, item)
+
+        self.table.resizeRowToContents(row)
+
+        if self.auto_scroll:
+            self.table.scrollToBottom()
+
+    def _show_context_menu(self, pos):
+        menu = QMenu(self)
+
+        copy_action = menu.addAction("Copy Line")
+        clear_action = menu.addAction("Clear All")
+
+        auto_scroll_action = menu.addAction("Auto-scroll")
+        auto_scroll_action.setCheckable(True)
+        auto_scroll_action.setChecked(self.auto_scroll)
+
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+
+        if action == copy_action:
+            row = self.table.rowAt(pos.y())
+            if row >= 0:
+                text = []
+                for col in range(self.table.columnCount()):
+                    item = self.table.item(row, col)
+                    if item:
+                        text.append(item.text())
+                QApplication.clipboard().setText("\t".join(text))
+
+        elif action == clear_action:
+            self.table.setRowCount(0)
+
+        elif action == auto_scroll_action:
+            self.auto_scroll = auto_scroll_action.isChecked()
+
+
+# Application and Context
 
 
 class ApplicationContext:
-    """A context object to be shared through different threads and application
-    layers to avoid use of global.
 
-    Common utilities:
-        Logging, Event Manager reference, settings
+    def __init__(
+        self,
+        name: str = "[MAIN]",
+        output_logger_file_path: Optional[str] = None,
+        console_logging: bool = True,
+    ) -> None:
 
-    Recommendations:
-        For a GUI application, it can be used as a base class to handle events,
-        settings, and logging.
+        self._logger_context = LoggerContext(output_logger_file_path, console_logging)
+        self._logger_widget: Optional[LoggerWidget] = None
 
-    """
-
-    def __init__(self, name: str = "[MAIN]") -> None:
-        self.data = dict(
+        self.data: Dict[str, Any] = dict(
             name=name,
             event_manager=None,
             settings=None,
-            log=None,
+            log=self._logger_context,  # Store logger context in data dict
         )
 
     def __getitem__(self, key):
@@ -1618,21 +2333,55 @@ class ApplicationContext:
     def name(self) -> str:
         return self.data["name"]
 
+    @property
+    def logger(self) -> LoggerContext:
+        """Get the logger context instance"""
+        return self._logger_context
 
-def Application(
-    ctx: Optional[ApplicationContext] = None,
-    argv: Optional[List[str]] = None,
-    css: Optional[str] = None,
-) -> QApplication:
-    if argv is None:
-        app = QApplication()
-    else:
-        app = QApplication(argv)
-    if ctx is not None:
-        app.ctx = ctx
-    if css is not None:
-        app.setStyleSheet(css)
-    return app
+    def create_logger_widget(self, parent: Optional[QWidget] = None) -> LoggerWidget:
+        """Create and return a new logger widget instance"""
+        if self._logger_widget is None:
+            self._logger_widget = LoggerWidget(self._logger_context, parent)
+        return self._logger_widget
+
+    def set_logger_widget(self, widget: LoggerWidget) -> None:
+        """Set an existing logger widget instance"""
+        self._logger_widget = widget
+
+    def log(self, level: LogLevel, message: Any, source: Optional[str] = None):
+        """Convenience method to log messages"""
+        if source is None:
+            source = self.name
+        self._logger_context.log(level, source, message)
+
+
+class Application(QApplication):
+    def __init__(
+        self,
+        argv: Optional[List[str]] = None,
+        ctx: Optional[ApplicationContext] = None,
+        css: Optional[str] = None,
+    ) -> None:
+        if isinstance(argv, list):
+            super().__init__(argv)
+        else:
+            super().__init__()
+
+        self.ctx: ApplicationContext
+        if ctx is None:
+            self.ctx = ApplicationContext()
+        else:
+            self.ctx = ctx
+
+        if css is not None:
+            self.setStyleSheet(css)
+
+    @staticmethod
+    def context() -> ApplicationContext:
+        app = Application.instance()
+        if isinstance(app, Application):
+            return app.ctx
+        raise RuntimeError("Application instance not found")
 
 
 def app_set_font(
@@ -1647,24 +2396,5 @@ def app_set_font(
     app.setFont(font)
 
 
-# timer
-def Timer(
-    *,
-    interval_ms: int = 1000,
-    single_shot: bool = False,
-    on_timeout: Optional[Slot] = None,
-    auto_start: bool = False,
-) -> QtCore.QTimer:
-    timer = QtCore.QTimer()
-    timer.setInterval(interval_ms)
-    timer.setSingleShot(single_shot)
-    timer.timeout.connect(on_timeout)
-    if auto_start:
-        timer.start()
-
-    return timer
-
-
-# process events
 def process_events() -> None:
     QCoreApplication.processEvents()

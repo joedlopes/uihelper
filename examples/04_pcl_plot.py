@@ -1,4 +1,8 @@
 import numpy as np
+
+import sys
+
+sys.path.append("../")
 from uihelper import dc, PCLViewWidget
 
 
@@ -29,7 +33,8 @@ def toggle_timer():
 
 
 window = dc.Widget(
-    window_ops=dc.WindowOps(size=(512, 512), title="Point Cloud Plot"),
+    window_title="Point Cloud Plot",
+    window_size=(512, 512),
     layout=dc.Rows(
         dc.Button("Random Plot", on_click=toggle_timer),
         dc.NextRow,

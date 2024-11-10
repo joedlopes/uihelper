@@ -79,7 +79,7 @@ class Draw3D(BaseDrawHelper):
         x: float,
         y: float,
         z: float,
-        color: Tuple[float, float, float] = (0, 1, 0, 1),
+        color: Tuple[float, float, float, float] = (0, 1, 0, 1),
         point_size: float = 0.05,
         update: bool = True,
     ) -> None:
@@ -171,7 +171,12 @@ class Draw3D(BaseDrawHelper):
     def lines(
         self,
         line_pts: np.ndarray,
-        colors: Tuple[float, float, float, float] = (0.0, 1.0, 0.0, 1.0),
+        colors: Union[Tuple[float, float, float, float], np.ndarray] = (
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+        ),
         line_width: float = 1.0,
         update: bool = True,
     ) -> None:
@@ -192,7 +197,7 @@ class Draw3D(BaseDrawHelper):
         y: float,
         z: float,
         text: str,
-        text_size: float = 10.0,
+        text_size: int = 10,
         text_color: Tuple[float, float, float, float] = (0.0, 1.0, 0.0, 1.0),
         update: bool = True,
     ) -> None:
@@ -205,7 +210,7 @@ class Draw3D(BaseDrawHelper):
             pos=(x * self.scale, y * self.scale, z * self.scale),
             color=(r, g, b, a),
             text=text,
-            font=QtGui.QFont("Monospace", text_size),
+            font=QtGui.QFont(("Monospace",), text_size),
         )
 
         self.plot_widget.addItem(item)

@@ -23,7 +23,7 @@ class BaseDrawHelper:
         x: float,
         y: float,
         z: float,
-        color: Tuple[float, float, float] = (0, 1, 0, 1),
+        color: Tuple[float, float, float, float] = (0, 1, 0, 1),
         point_size: float = 0.05,
         update: bool = True,
     ) -> None:

@@ -16,7 +16,7 @@ Tested on Python 3.12 on Windows 10, Windows 11, MacOS M2, Ubuntu 22.
 Install the requirements:
 
 ```bash
-python -m pip install pyside6 pydantic pyopengl pyqtgraph numpy
+python -m pip install pyside6 pyopengl pyqtgraph numpy
 ```
 
 Additional libraries for styling:
@@ -61,7 +61,8 @@ win = dc.Widget(
         dc.TextEdit(placeholder_text="type a text"),
         align=dc.Align.Top | dc.Align.Left,
     ),
-    window_ops=dc.WindowOps(title="Simple Window", size=(400, 400)),
+    window_title="Window Example",
+    window_size=(500, 500),
     show=True,
 )
 
@@ -106,10 +107,8 @@ class MyMainWindow(dc.QMainWindow):
         # setup main window
         dc.MainWindow(
             widget=self,
-            window_ops=dc.WindowOps(
-                title="MainWindow::UiHelper",
-                size=(1024, 768),
-            ),
+            window_size=(1024, 768),
+            window_title="MainWindow::UiHelper",
             menubar=dc.MenuBar(
                 dc.Menu(
                     "&File",

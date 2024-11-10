@@ -22,7 +22,7 @@ setup(
     project_urls={
         "Bug Tracker": "https://github.com/joedlopes/uihelper/issues",
     },
-    install_requires=["pyside6", "pydantic", "pyqtgraph", "pyopengl", "numpy"],
+    install_requires=["pyside6<=6.7", "pyqtgraph", "pyopengl", "numpy"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
